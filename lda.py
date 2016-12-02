@@ -9,9 +9,10 @@ from stop_words import get_stop_words
 from nltk.stem.porter import PorterStemmer
 from gensim import corpora, models
 
-topics = 100
+topics = 50
 passes = 10
 test_set_limit = 10
+threshold = 100
 
 #Tokenizer
 tokenizer = RegexpTokenizer(r'\w+')
@@ -68,7 +69,7 @@ def buildCorpus(texts, dictionary):
 def generateLDA(corpus, dictionary, topic_num, pass_num):
     tlog("Generating LDA Model.")
     # generate LDA model
-    ldamodel = models.ldamodel.LdaMulticore(corpus, num_topics = topic_num, id2word = dictionary, passes = pass_num, workers = 3)
+    ldamodel = models.LdaMulticore(corpus, num_topics = topic_num, id2word = dictionary, passes = pass_num, workers = 3)
     tlog("LDA Model generated.")
     return ldamodel
 
@@ -103,7 +104,6 @@ train_dict = buildDictionary(training_processed_texts)
 train_corpus = buildCorpus(training_processed_texts, train_dict)
 
 #Read lda from disk, if not available build it and save it
-topics = 250
 if os.path.isfile("./ldamodel"):
     print("["+getTime()+"] Loading saved LDA model from disk.")
     lda = models.ldamodel.LdaModel.load(fname="./ldamodel")
@@ -116,7 +116,6 @@ test_set_corpus = buildCorpus(test_processed_texts, train_dict)
 
 #Query and evaluate results
 eval = Evaluator(training_set)
-threshold = 10
 
 tp = 0
 tn = 0
@@ -145,8 +144,6 @@ for i in range(0, len(test_set)):
 
     results = []
     for j in range(0,len(training_set)):
-        if j % 1000 == 0:
-            tlog(str(j))
         cos_sim = cossim(train_topic_list[j], query_doc_topics)
         results.append((cos_sim, training_set[j]))
 
