@@ -145,8 +145,6 @@ for i in range(0, len(test_set)):
 
     results = []
     for j in range(0,len(training_set)):
-        if j % 1000 == 0:
-            tlog(str(j))
         cos_sim = cossim(train_topic_list[j], query_doc_topics)
         results.append((cos_sim, training_set[j]))
 
