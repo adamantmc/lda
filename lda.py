@@ -68,7 +68,7 @@ def buildCorpus(texts, dictionary):
 def generateLDA(corpus, dictionary, topic_num, pass_num):
     tlog("Generating LDA Model.")
     # generate LDA model
-    ldamodel = models.ldamodel.LdaMulticore(corpus, num_topics = topic_num, id2word = dictionary, passes = pass_num, workers = 3)
+    ldamodel = models.LdaMulticore(corpus, num_topics = topic_num, id2word = dictionary, passes = pass_num, workers = 3)
     tlog("LDA Model generated.")
     return ldamodel
 
