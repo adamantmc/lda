@@ -1,12 +1,17 @@
 import json
 import datetime
 import os.path
+import numpy as np
 from evaluator import Evaluator
 from math import sqrt
 from nltk.tokenize import RegexpTokenizer
 from stop_words import get_stop_words
 from nltk.stem.porter import PorterStemmer
 from gensim import corpora, models
+
+topics = 100
+passes = 10
+test_set_limit = 10
 
 #Tokenizer
 tokenizer = RegexpTokenizer(r'\w+')
@@ -22,21 +27,12 @@ def tlog(msg):
     print("["+getTime()+"] "+msg)
 
 def cossim(v1, v2):
-    v1_mag = 0
-    v2_mag = 0
-    product = 0
-
-    for i in range(0,len(v1)):
-        product += v1[i][1]*v2[i][1]
-        v1_mag += v1[i][1]*v1[i][1]
-        v2_mag += v2[i][1]*v2[i][1]
-
-    v1_mag = sqrt(v1_mag)
-    v2_mag = sqrt(v2_mag)
-
-    cos_sim = product / (v1_mag * v2_mag)
-
-    return cos_sim
+    v1_mag = np.linalg.norm(v1)
+    v2_mag = np.linalg.norm(v2)
+    product = np.dot(v1,v2)
+    
+    cosine_sim = product / (v1_mag * v2_mag)
+    return cosine_sim
 
 def processTexts(texts):
     processed_texts = []
@@ -72,7 +68,7 @@ def buildCorpus(texts, dictionary):
 def generateLDA(corpus, dictionary, topic_num, pass_num):
     tlog("Generating LDA Model.")
     # generate LDA model
-    ldamodel = models.ldamodel.LdaModel(corpus, num_topics = topic_num, id2word = dictionary, passes = pass_num)
+    ldamodel = models.ldamodel.LdaMulticore(corpus, num_topics = topic_num, id2word = dictionary, passes = pass_num, workers = 3)
     tlog("LDA Model generated.")
     return ldamodel
 
@@ -83,7 +79,11 @@ training_set = json.load(open("trainingSet"))["documents"]
 training_set_texts = [doc["abstractText"] for doc in training_set]
 tlog("Training set read.");
 
-test_set = json.load(open("testSet"))["documents"][0:1]
+if test_set_limit !=-1: 
+    test_set = json.load(open("testSet"))["documents"][0:test_set_limit]
+else: 
+    test_set = json.load(open("testSet"))["documents"]
+
 test_set_texts = [doc["abstractText"] for doc in test_set]
 tlog("Test set read.")
 
@@ -103,12 +103,12 @@ train_dict = buildDictionary(training_processed_texts)
 train_corpus = buildCorpus(training_processed_texts, train_dict)
 
 #Read lda from disk, if not available build it and save it
-topics = 50
+topics = 250
 if os.path.isfile("./ldamodel"):
     print("["+getTime()+"] Loading saved LDA model from disk.")
     lda = models.ldamodel.LdaModel.load(fname="./ldamodel")
 else:
-    lda = generateLDA(train_corpus, train_dict, topics, 100)
+    lda = generateLDA(train_corpus, train_dict, topics, passes)
     lda.save("./ldamodel")
 
 #Build corpus on test set
@@ -131,18 +131,30 @@ mi_precision = 0
 mi_recall = 0
 mi_f1score = 0
 
+tlog("Creating training set topic list.")
+train_topic_list = []
+for i in range(0, len(training_set)):
+    train_topic_list.append([x[1] for x in lda.get_document_topics(train_corpus[i], minimum_probability=0)])
+tlog("Topic list done.")
+
 for i in range(0, len(test_set)):
-    query_doc = lda[test_set_corpus[i]]
+    query_doc = test_set_corpus[i]
+    query_doc_topics = [x[1] for x in lda.get_document_topics(query_doc, minimum_probability=0)]
 
     tlog("Calculating similarities.")
 
     results = []
     for j in range(0,len(training_set)):
-        cos_sim = cossim(lda.get_document_topics(train_corpus[j], minimum_probability=0), lda.get_document_topics(query_doc, minimum_probability=0))
+        if j % 1000 == 0:
+            tlog(str(j))
+        cos_sim = cossim(train_topic_list[j], query_doc_topics)
         results.append((cos_sim, training_set[j]))
 
     tlog("Sorting by similarity score.")
     results.sort(key=lambda tup: tup[0], reverse=True)
+
+    for (x,y) in results[0:threshold]:
+        print(y["title"])
 
     eval.query([y for (x,y) in results[0:threshold]], test_set[i])
     eval.calculate()
@@ -155,6 +167,7 @@ for i in range(0, len(test_set)):
     ma_precision += eval.getPrecision()
     ma_recall += eval.getRecall()
     ma_accuracy += eval.getAccuracy()
+    ma_f1score += eval.getF1Score()
 
 mi_accuracy = (tp+tn)/(tp+tn+fp+fn)
 mi_precision = tp/(tp+fp)
@@ -164,9 +177,9 @@ mi_f1score = 2*mi_precision*mi_recall/(mi_precision+mi_recall)
 ma_accuracy = ma_accuracy / len(test_set)
 ma_precision = ma_precision / len(test_set)
 ma_recall = ma_recall / len(test_set)
-ma_f1score = 2*ma_precision*ma_recall/(ma_precision+ma_recall)
+ma_f1score = ma_f1score / len(test_set)
 
-print("Resluts:")
+print("Results:")
 print("================================")
 print("Micro-average:")
 print("Accuracy: "+str(mi_accuracy))
@@ -185,23 +198,6 @@ print("TN: "+str(tn))
 print("FP: "+str(fp))
 print("FN: "+str(fn))
 print("================================")
-'''
-print(lda)
-
-test_doc = corpus[len(training_set)]
-
-results = []
-
-for i in range(0, len(training_set)):
-    cos_sim = cossim(lda.get_document_topics(test_doc, minimum_probability=0), lda.get_document_topics(corpus[i], minimum_probability=0))
-    results.append((training_set[i]["title"], cos_sim))
-
-results.sort(key=lambda tup: tup[1], reverse=True)
-
-print(test_set[0]["title"])
-for i in range(0,10):
-    print(results[i])
-'''
 
 tlog("Done.")
 
