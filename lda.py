@@ -9,7 +9,7 @@ from stop_words import get_stop_words
 from nltk.stem.porter import PorterStemmer
 from gensim import corpora, models
 
-topics = 50
+topics = 100
 passes = 10
 test_set_limit = 10
 threshold = 100
