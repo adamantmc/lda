@@ -103,7 +103,6 @@ train_dict = buildDictionary(training_processed_texts)
 train_corpus = buildCorpus(training_processed_texts, train_dict)
 
 #Read lda from disk, if not available build it and save it
-topics = 250
 if os.path.isfile("./ldamodel"):
     print("["+getTime()+"] Loading saved LDA model from disk.")
     lda = models.ldamodel.LdaModel.load(fname="./ldamodel")
