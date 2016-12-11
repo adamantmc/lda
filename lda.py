@@ -3,16 +3,30 @@ import datetime
 import os.path
 import numpy as np
 from evaluator import Evaluator
+from metrics import Metrics
+from filewriter import FileWriter
 from math import sqrt
 from nltk.tokenize import RegexpTokenizer
 from stop_words import get_stop_words
 from nltk.stem.porter import PorterStemmer
 from gensim import corpora, models
 
+test_set_path = "testSet"
+training_set_path = "trainingSet"
 topics = 100
-passes = 10
+passes = 1
 test_set_limit = 10
-threshold = 100
+threshold_start = 10
+threshold_end = 200
+
+thresholds = []
+metrics_obj_list = []
+
+fw = FileWriter()
+
+for i in range(threshold_start, threshold_end+1):
+    thresholds.append(i)
+    metrics_obj_list.append(Metrics())
 
 #Tokenizer
 tokenizer = RegexpTokenizer(r'\w+')
@@ -76,14 +90,14 @@ def generateLDA(corpus, dictionary, topic_num, pass_num):
 start_time = getTime()
 
 #Reading both sets
-training_set = json.load(open("trainingSet"))["documents"]
+training_set = json.load(open(training_set_path))["documents"]
 training_set_texts = [doc["abstractText"] for doc in training_set]
 tlog("Training set read.");
 
 if test_set_limit !=-1: 
-    test_set = json.load(open("testSet"))["documents"][0:test_set_limit]
+    test_set = json.load(open(test_set_path))["documents"][0:test_set_limit]
 else: 
-    test_set = json.load(open("testSet"))["documents"]
+    test_set = json.load(open(test_set_path))["documents"]
 
 test_set_texts = [doc["abstractText"] for doc in test_set]
 tlog("Test set read.")
@@ -117,19 +131,6 @@ test_set_corpus = buildCorpus(test_processed_texts, train_dict)
 #Query and evaluate results
 eval = Evaluator(training_set)
 
-tp = 0
-tn = 0
-fp = 0
-fn = 0
-ma_accuracy = 0
-ma_precision = 0
-ma_recall = 0
-ma_f1score = 0
-mi_accuracy = 0
-mi_precision = 0
-mi_recall = 0
-mi_f1score = 0
-
 tlog("Creating training set topic list.")
 train_topic_list = []
 for i in range(0, len(training_set)):
@@ -150,51 +151,25 @@ for i in range(0, len(test_set)):
     tlog("Sorting by similarity score.")
     results.sort(key=lambda tup: tup[0], reverse=True)
 
-    for (x,y) in results[0:threshold]:
-        print(y["title"])
+    fw.writeQueryResults(results[0:thresholds[-1]], i)
 
-    eval.query([y for (x,y) in results[0:threshold]], test_set[i])
-    eval.calculate()
+    for k in range(0, len(thresholds)):
+        threshold = thresholds[k]
 
-    tp += eval.getTp()
-    tn += eval.getTn()
-    fp += eval.getFp()
-    fn += eval.getFn()
+        eval.query([y for (x,y) in results[0:threshold]], test_set[i])
+        eval.calculate()
 
-    ma_precision += eval.getPrecision()
-    ma_recall += eval.getRecall()
-    ma_accuracy += eval.getAccuracy()
-    ma_f1score += eval.getF1Score()
+        metrics_obj_list[k].updateConfusionMatrix(eval.getTp(), eval.getTn(), eval.getFp(), eval.getFn())
+        metrics_obj_list[k].updateMacroAverages(eval.getAccuracy(), eval.getF1Score(), eval.getPrecision(), eval.getRecall())
 
-mi_accuracy = (tp+tn)/(tp+tn+fp+fn)
-mi_precision = tp/(tp+fp)
-mi_recall = tp/(tp+fn)
-mi_f1score = 2*mi_precision*mi_recall/(mi_precision+mi_recall)
 
-ma_accuracy = ma_accuracy / len(test_set)
-ma_precision = ma_precision / len(test_set)
-ma_recall = ma_recall / len(test_set)
-ma_f1score = ma_f1score / len(test_set)
+for obj in metrics_obj_list:
+    obj.calculate(len(test_set))
 
-print("Results:")
-print("================================")
-print("Micro-average:")
-print("Accuracy: "+str(mi_accuracy))
-print("Precision: "+str(mi_precision))
-print("Recall: "+str(mi_recall))
-print("F1Score: "+str(mi_f1score))
-print("================================")
-print("Macro-average:")
-print("Accuracy: "+str(ma_accuracy))
-print("Precision: "+str(ma_precision))
-print("Recall: "+str(ma_recall))
-print("F1Score: "+str(ma_f1score))
-print("================================")
-print("TP: "+str(tp))
-print("TN: "+str(tn))
-print("FP: "+str(fp))
-print("FN: "+str(fn))
-print("================================")
+fw.writeToFiles(metrics_obj_list, thresholds)
+
+for i in range(0, len(thresholds)):
+    print("Threshold: "+str(thresholds[i]) + " Recall: " + str(metrics_obj_list[i].ma_recall) + " " + str(metrics_obj_list[i].mi_recall))
 
 tlog("Done.")
 
