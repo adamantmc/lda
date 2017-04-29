@@ -34,9 +34,9 @@ class FileWriter:
             files[5].write(str(thresholds[i]) + " " + str(metrics_obj_list[i].mi_f1score) + "\n")
             files[6].write(str(thresholds[i]) + " " + str(metrics_obj_list[i].mi_precision) + "\n")
             files[7].write(str(thresholds[i]) + " " + str(metrics_obj_list[i].mi_recall) + "\n")
-            files[8].write(str(thresholds[i]) + " " + str(metrics_obj_list[i].average_doc_precision) + "\n")
-            files[9].write(str(thresholds[i]) + " " + str(metrics_obj_list[i].average_doc_recall) + "\n")
-            files[10].write(str(thresholds[i]) + " " + str(metrics_obj_list[i].average_doc_f1score) + "\n")
+            files[8].write(str(thresholds[i]) + " " + str(metrics_obj_list[i].average_doc_precision) + " " + str(metrics_obj_list[i].doc_precision_std_dev) + "\n")
+            files[9].write(str(thresholds[i]) + " " + str(metrics_obj_list[i].average_doc_recall) + " " + str(metrics_obj_list[i].doc_recall_std_dev)    + "\n")
+            files[10].write(str(thresholds[i]) + " " + str(metrics_obj_list[i].average_doc_f1score) + " " + str(metrics_obj_list[i].doc_f1score_std_dev) + "\n")
             files[11].write(str(thresholds[i]) + " " + str(metrics_obj_list[i].combined_f1score) + "\n")
             files[12].write(str(thresholds[i]) + " " + str(metrics_obj_list[i].mean_average_precision) + "\n")
 

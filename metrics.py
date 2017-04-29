@@ -1,3 +1,5 @@
+import math
+
 class Metrics:
     def __init__(self):
         self.mi_accuracy = 0
@@ -18,6 +20,10 @@ class Metrics:
         self.combined_f1score = 0
         self.mean_average_precision = 0
 
+        self.doc_precision_values = []
+        self.doc_recall_values = []
+        self.doc_f1score_values = []
+
     def updateMacroAverages(self, eval):
         self.ma_accuracy += eval.getAccuracy()
         self.ma_f1score += eval.getF1Score()
@@ -30,6 +36,10 @@ class Metrics:
         self.combined_f1score += eval.getCombinedF1score()
 
         self.mean_average_precision += eval.getAveragePrecision()
+
+        self.doc_precision_values.append(eval.getAverageDocPrecision())
+        self.doc_recall_values.append(eval.getAverageDocRecall())
+        self.doc_f1score_values.append(eval.getAverageDocF1score())
 
     def updateConfusionMatrix(self, eval):
         self.tp += eval.getTp()
@@ -53,3 +63,19 @@ class Metrics:
         self.combined_f1score = self.combined_f1score / test_set_size
 
         self.mean_average_precision = self.mean_average_precision / test_set_size;
+
+        prec_variance = 0
+        rec_variance = 0
+        f1_variance = 0
+        for i in range(len(self.doc_precision_values)):
+            prec_variance += self.doc_precision_values[i]*self.average_doc_precision
+            rec_variance += self.doc_recall_values[i]*self.average_doc_recall
+            f1_variance += self.doc_f1score_values[i]*self.average_doc_precision
+
+        prec_variance /= test_set_size
+        rec_variance /= test_set_size
+        f1_variance /= test_set_size
+
+        self.doc_precision_std_dev = math.sqrt(prec_variance)
+        self.doc_recall_std_dev = math.sqrt(rec_variance)
+        self.doc_f1score_std_dev = math.sqrt(f1_variance)

@@ -15,9 +15,9 @@ test_set_path = "testSet"
 training_set_path = "trainingSet"
 topics = 100
 passes = 1
-test_set_limit = 10
-threshold_start = 10
-threshold_end = 200
+test_set_limit = 200
+threshold_start = 1
+threshold_end = 10
 
 thresholds = []
 metrics_obj_list = []
@@ -45,7 +45,7 @@ def cossim(v1, v2):
     v1_mag = np.linalg.norm(v1)
     v2_mag = np.linalg.norm(v2)
     product = np.dot(v1,v2)
-    
+
     cosine_sim = product / (v1_mag * v2_mag)
     return cosine_sim
 
@@ -94,9 +94,9 @@ training_set = json.load(open(training_set_path))["documents"]
 training_set_texts = [doc["abstractText"] for doc in training_set]
 tlog("Training set read.");
 
-if test_set_limit !=-1: 
+if test_set_limit !=-1:
     test_set = json.load(open(test_set_path))["documents"][0:test_set_limit]
-else: 
+else:
     test_set = json.load(open(test_set_path))["documents"]
 
 test_set_texts = [doc["abstractText"] for doc in test_set]
@@ -159,8 +159,8 @@ for i in range(0, len(test_set)):
         eval.query([y for (x,y) in results[0:threshold]], test_set[i])
         eval.calculate()
 
-        metrics_obj_list[k].updateConfusionMatrix(eval.getTp(), eval.getTn(), eval.getFp(), eval.getFn())
-        metrics_obj_list[k].updateMacroAverages(eval.getAccuracy(), eval.getF1Score(), eval.getPrecision(), eval.getRecall())
+        metrics_obj_list[k].updateConfusionMatrix(eval)
+        metrics_obj_list[k].updateMacroAverages(eval)
 
 
 for obj in metrics_obj_list:

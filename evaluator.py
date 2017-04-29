@@ -24,13 +24,27 @@ class Evaluator:
         retrieved_labels = set()
         prev_recall = 0
 
+        doc_tp = 0
+        doc_fp = 0
+        doc_fn = 0
+
         for doc in self.retrieved_docs:
             relevant = 0
 
+            t_doc_tp = 0
+            t_doc_fp = 0
+            t_doc_fn = 0
+            
             for label in doc["meshMajor"]:
                 retrieved_labels.add(label)
                 if label in self.query_doc["meshMajor"]:
-                    relevant += 1
+                    t_doc_tp += 1
+                else:
+                    t_doc_fp += 1
+
+            doc_tp += t_doc_tp
+            doc_fp += t_doc_fp
+            doc_fn += len(self.query_doc["meshMajor"]) - t_doc_tp
 
             map_relevant = 0
             for label in retrieved_labels:
@@ -43,13 +57,6 @@ class Evaluator:
             self.average_precision += prec_at_i*(rec_at_i - prev_recall)
             prev_recall = rec_at_i
 
-            av_doc_prec = relevant / len(doc["meshMajor"])
-            av_doc_rec = relevant / len(self.query_doc["meshMajor"])
-            self.average_doc_precision += av_doc_prec
-            self.average_doc_recall += av_doc_rec
-            if av_doc_prec != 0 and av_doc_rec != 0:
-                self.average_doc_f1score += 2*(av_doc_prec*av_doc_rec)/(av_doc_rec+av_doc_prec)
-
         for label in self.query_doc["meshMajor"]:
             if label in retrieved_labels:
                 self.tp = self.tp + 1
@@ -57,12 +64,22 @@ class Evaluator:
             else:
                 self.fn = self.fn + 1
 
-        self.average_doc_precision = self.average_doc_precision / len(self.retrieved_docs)
-        self.average_doc_recall = self.average_doc_recall / len(self.retrieved_docs)
-        self.average_doc_f1score = self.average_doc_f1score / len(self.retrieved_docs)
+        print(doc_tp, doc_fp, doc_fn)
+        self.average_doc_precision = doc_tp / (doc_tp + doc_fp)
+        self.average_doc_recall = doc_tp / (doc_tp + doc_fn)
+
+        if self.average_doc_precision + self.average_doc_recall != 0:
+            self.average_doc_f1score = 2*(self.average_doc_precision*self.average_doc_recall) / (self.average_doc_precision + self.average_doc_recall)
+        else:
+            self.average_doc_f1score = 0
+
         self.fp = len(retrieved_labels)
         self.tn = self.all_label_count - self.fp - self.fn - self.tp
-        self.combined_f1score = 2 * (self.average_doc_precision * self.getRecall())/(self.average_doc_precision + self.getRecall())
+
+        if (self.average_doc_precision + self.getRecall() != 0):
+            self.combined_f1score = 2 * (self.average_doc_precision * self.getRecall())/(self.average_doc_precision + self.getRecall())
+        else:
+            self.combined_f1score = 0
 
     def getTp(self):
         return self.tp
