@@ -5,6 +5,7 @@ import numpy as np
 from evaluator import Evaluator
 from metrics import Metrics
 from filewriter import FileWriter
+from topic_index import TopicIndex
 from math import sqrt
 from nltk.tokenize import RegexpTokenizer
 from stop_words import get_stop_words
@@ -13,7 +14,7 @@ from gensim import corpora, models
 
 test_set_path = "testSet"
 training_set_path = "trainingSet"
-topics = 100
+topics = 800
 passes = 1
 test_set_limit = 200
 threshold_start = 1
@@ -102,8 +103,6 @@ else:
 test_set_texts = [doc["abstractText"] for doc in test_set]
 tlog("Test set read.")
 
-print()
-
 #Processing both sets - tokenization, stop-word removal, stemming
 tlog("Processing training set.")
 training_processed_texts = processTexts(training_set_texts)
@@ -129,37 +128,45 @@ else:
 test_set_corpus = buildCorpus(test_processed_texts, train_dict)
 
 #Query and evaluate results
-eval = Evaluator(training_set)
+eval = Evaluator()
 
 tlog("Creating training set topic list.")
-train_topic_list = []
+
+train_topic_list = {}
 for i in range(0, len(training_set)):
-    train_topic_list.append([x[1] for x in lda.get_document_topics(train_corpus[i], minimum_probability=0)])
+    train_topic_list[i] = lda.get_document_topics(train_corpus[i])
+
 tlog("Topic list done.")
+
+tlog("Creating topic index.")
+index = TopicIndex(train_topic_list)
+tlog("Topic index done.")
 
 for i in range(0, len(test_set)):
     query_doc = test_set_corpus[i]
-    query_doc_topics = [x[1] for x in lda.get_document_topics(query_doc, minimum_probability=0)]
+    query_doc_topics = lda.get_document_topics(query_doc)
 
-    tlog("Calculating similarities.")
-
-    results = []
+    '''
+    cos_results = []
     for j in range(0,len(training_set)):
-        cos_sim = cossim(train_topic_list[j], query_doc_topics)
-        results.append((cos_sim, training_set[j]))
+        cos_sim = cossim([y for (x,y) in train_topic_list[j]], [y for (x,y) in query_doc_topics])
+        cos_results.append((cos_sim, j))
 
     tlog("Sorting by similarity score.")
-    results.sort(key=lambda tup: tup[0], reverse=True)
+    cos_results.sort(key=lambda tup: tup[0], reverse=True)
 
-    fw.writeQueryResults(results[0:thresholds[-1]], i)
+    #fw.writeQueryResults(results[0:thresholds[-1]], i)
+    '''
+
+    results = index.query(query_doc_topics)
 
     for k in range(0, len(thresholds)):
         threshold = thresholds[k]
 
-        eval.query([y for (x,y) in results[0:threshold]], test_set[i])
+        eval.query([training_set[x] for (x,y) in results[0:threshold]], test_set[i])
         eval.calculate()
 
-        metrics_obj_list[k].updateConfusionMatrix(eval)
+        #metrics_obj_list[k].updateConfusionMatrix(eval)
         metrics_obj_list[k].updateMacroAverages(eval)
 
 
@@ -167,9 +174,6 @@ for obj in metrics_obj_list:
     obj.calculate(len(test_set))
 
 fw.writeToFiles(metrics_obj_list, thresholds)
-
-for i in range(0, len(thresholds)):
-    print("Threshold: "+str(thresholds[i]) + " Recall: " + str(metrics_obj_list[i].ma_recall) + " " + str(metrics_obj_list[i].mi_recall))
 
 tlog("Done.")
 
